@@ -1,0 +1,49 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: Landing
+  datasource:
+    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+    url: jdbc:log4jdbc:mysql://localhost:3306/arescom?allowMultiQueries=true&useUnicode=true&characterEncoding=UTF-8
+    username: idesk
+    password: songdojcoms1
+
+# MyBatis 설정 (최신 버전은 mybatis-spring-boot-starter 3.x 기준)
+mybatis:
+   type-aliases-package: kr.arescom.landing.**.vo
+   configuration:
+     map-underscore-to-camel-case: true
+     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 로그 레벨
+logging:
+  level:
+    root: INFO
+    egovframework: INFO
+    org.springframework.security: INFO
+# 부모(log4jdbc.log4j2)는 ERROR가 아니라 INFO 혹은 DEBUG로 열어둬야 합니다.
+    log4jdbc.log4j2: INFO
+    
+# 여기서부터 중요! 부모는 열되, 보기 싫은 자식들만 OFF 합니다.
+    jdbc:
+      sqlonly: info          # 실행된 SQL (이것만 ON)
+      resultsettable: info   # 결과 테이블 (이게 핵심!)
+      audit: off             # 노이즈 차단 (반드시 OFF)
+      resultset: off         # 노이즈 차단 (반드시 OFF)
+      connection: off        # 노이즈 차단 (반드시 OFF)
+      sqltiming: off         # 노이즈 차단 (반드시 OFF)
+
+# 로그 파일 저장 설정
+  file:
+    name: /home/arescom/logs/landing/landing.log # 저장될 경로와 파일명
+    
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB    # 파일당 최대 용량
+      max-history: 7         # 7일간 보관
+      total-size-cap: 1GB    # 전체 로그 합계 제한
+
+    pattern:
+      file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
