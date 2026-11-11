@@ -2,6 +2,9 @@ package kr.arescom.landing.admin.mng.service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
@@ -21,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import kr.arescom.landing.adhrnc.vo.AdhrncVO;
+import kr.arescom.landing.admin.mng.dto.ExcelColumnDto;
 import kr.arescom.landing.admin.mng.mapper.AdhrncMngMapper;
 import kr.arescom.landing.admin.mng.vo.AdhrncMngListResponseVO;
 import kr.arescom.landing.admin.mng.vo.AdhrncMngSearchVO;
@@ -96,13 +100,77 @@ public class AdhrncMngService {
         return result;
     }
 
+ // 엑셀 다운로드 허용 컬럼
+    private static final Set<String> ALLOWED_COLUMNS = Set.of(
+        "REG_DT",
+        "ADHRNC_NM",
+        "MOBLPHON",
+        "EMAIL",
+        "CUST_NM_01",
+        "CUST_NM_02",
+        "CUST_NM_03",
+        "CUST_NM_04",
+        "CUST_NM_05",
+        "CUST_NM_06",
+        "CUST_NM_07",
+        "CUST_NM_08",
+        "CUST_NM_09",
+        "CUST_NM_10",
+        "CUST_NM_11",
+        "CUST_NM_12",
+        "CUST_NM_13",
+        "CUST_NM_14",
+        "CUST_NM_15"
+    );
+
+    // 엑셀 컬럼 검증
+    private void validateExcelColumns(List<ExcelColumnDto> columns) {
+
+        if (columns == null || columns.isEmpty()) {
+            throw new IllegalArgumentException("엑셀 컬럼 정보가 없습니다.");
+        }
+
+        for (ExcelColumnDto column : columns) {
+
+            String columnName = column.getColumnName();
+
+            if (columnName == null ||
+                    !ALLOWED_COLUMNS.contains(columnName)) {
+                throw new IllegalArgumentException(
+                    "허용되지 않은 엑셀 컬럼입니다: " + columnName
+                );
+            }
+
+            if (column.getHeaderName() == null ||
+                    column.getHeaderName().isBlank()) {
+                throw new IllegalArgumentException("엑셀 헤더명이 없습니다.");
+            }
+        }
+    }
+
+
     // 엑셀 다운로드
-    public byte[] selectAdhrncMngExcel(AdhrncMngSearchVO searchVO) throws IOException {
+    public byte[] selectAdhrncMngExcel(
+            AdhrncMngSearchVO searchVO,
+            List<ExcelColumnDto> columns
+    ) throws IOException {
 
         validateSearch(searchVO);
 
+        // 컬럼 검증
+        validateExcelColumns(columns);
+
+        // 쿼리용 DB 컬럼명 추출
+        List<String> queryColumns = columns.stream()
+            .map(ExcelColumnDto::getColumnName)
+            .toList();
+
         // 엑셀은 페이징 없이 검색 조건에 해당하는 전체 데이터 조회
-        var list = adhrncMngMapper.selectAdhrncMngExcelList(searchVO);
+        List<Map<String, Object>> list =
+            adhrncMngMapper.selectAdhrncMngExcelList(
+                searchVO,
+                queryColumns
+            );
 
         try (
             Workbook workbook = new XSSFWorkbook();
@@ -114,9 +182,8 @@ public class AdhrncMngService {
             // ==============================
             // 헤더 스타일
             // ==============================
-//            CellStyle headerStyle = workbook.createCellStyle();
-
-            XSSFCellStyle headerStyle = (XSSFCellStyle) workbook.createCellStyle();
+            XSSFCellStyle headerStyle =
+                (XSSFCellStyle) workbook.createCellStyle();
 
             headerStyle.setFillForegroundColor(
                 new XSSFColor(
@@ -124,8 +191,7 @@ public class AdhrncMngService {
                     new DefaultIndexedColorMap()
                 )
             );
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            
+
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
             // 테두리
@@ -167,24 +233,21 @@ public class AdhrncMngService {
             // ==============================
             // 헤더 생성
             // ==============================
-            String[] headers = {
-                "번호",
-                "신청일시",
-                "성명",
-                "연락처",
-                "소속",
-                "선박명"
-            };
-
             Row headerRow = sheet.createRow(0);
             headerRow.setHeightInPoints(25);
 
-            for (int i = 0; i < headers.length; i++) {
+            // 번호는 고정
+            Cell numberHeader = headerRow.createCell(0);
+            numberHeader.setCellValue("번호");
+            numberHeader.setCellStyle(headerStyle);
 
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
+            // 전달받은 엑셀 헤더
+            for (int i = 0; i < columns.size(); i++) {
+
+                Cell cell = headerRow.createCell(i + 1);
+
+                cell.setCellValue(columns.get(i).getHeaderName());
                 cell.setCellStyle(headerStyle);
-
             }
 
             // ==============================
@@ -192,27 +255,40 @@ public class AdhrncMngService {
             // ==============================
             int rowNum = 1;
 
-            for (AdhrncVO adhrncVO : list) {
+            for (Map<String, Object> data : list) {
 
-                Row row = sheet.createRow(rowNum++);
+                Row row = sheet.createRow(rowNum);
 
-                row.createCell(0).setCellValue(rowNum -1);
-                row.createCell(1).setCellValue(nullToEmpty(adhrncVO.getRegDt()));
-                row.createCell(2).setCellValue(nullToEmpty(adhrncVO.getAdhrncNm()));
-                row.createCell(3).setCellValue(nullToEmpty(adhrncVO.getMoblphon()));
-                row.createCell(4).setCellValue(nullToEmpty(adhrncVO.getCustNm01()));
-                row.createCell(5).setCellValue(nullToEmpty(adhrncVO.getCustNm02()));
+                // 순번
+                Cell numberCell = row.createCell(0);
+                numberCell.setCellValue(rowNum);
+                numberCell.setCellStyle(dataStyle);
 
-                for (int i = 0; i < headers.length; i++) {
-                    row.getCell(i).setCellStyle(dataStyle);
+                // 데이터
+                for (int i = 0; i < columns.size(); i++) {
+
+                    String columnName = columns.get(i).getColumnName();
+
+                    Cell cell = row.createCell(i + 1);
+
+                    Object value = getColumnValue(data, columnName);
+
+                    cell.setCellValue(
+                        value == null ? "" : value.toString()
+                    );
+
+                    cell.setCellStyle(dataStyle);
                 }
 
+                rowNum++;
             }
 
             // ==============================
             // 열 너비 자동 조정
             // ==============================
-            for (int i = 0; i < headers.length; i++) {
+            int totalColumns = columns.size() + 1;
+
+            for (int i = 0; i < totalColumns; i++) {
 
                 sheet.autoSizeColumn(i);
 
@@ -220,17 +296,34 @@ public class AdhrncMngService {
                 int width = sheet.getColumnWidth(i) + 512;
 
                 // 엑셀 최대 열 너비 제한
-                sheet.setColumnWidth(i, Math.min(width, 255 * 256));
-
+                sheet.setColumnWidth(
+                    i,
+                    Math.min(width, 255 * 256)
+                );
             }
 
             // 파일 작성
             workbook.write(outputStream);
 
             return outputStream.toByteArray();
+        }
+    }
 
+
+    // Map 컬럼명 대소문자 대응
+    private Object getColumnValue(
+            Map<String, Object> data,
+            String columnName
+    ) {
+
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+
+            if (entry.getKey().equalsIgnoreCase(columnName)) {
+                return entry.getValue();
+            }
         }
 
+        return null;
     }
 
 //    private void validateAdhrnc(AdhrncVO adhrncVO) {

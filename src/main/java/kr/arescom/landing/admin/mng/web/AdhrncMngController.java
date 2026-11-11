@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import kr.arescom.landing.adhrnc.vo.AdhrncVO;
+import kr.arescom.landing.admin.mng.dto.ExcelDownloadRequest;
 import kr.arescom.landing.admin.mng.service.AdhrncMngService;
 import kr.arescom.landing.admin.mng.vo.AdhrncMngListResponseVO;
 import kr.arescom.landing.admin.mng.vo.AdhrncMngSearchVO;
@@ -122,10 +123,14 @@ public class AdhrncMngController {
      */
     @PostMapping("/excel")
     public ResponseEntity<byte[]> selectAdhrncMngExcel(
-            @RequestBody AdhrncMngSearchVO searchVO) throws IOException {
+            @RequestBody ExcelDownloadRequest request
+    ) throws IOException {
 
         byte[] excelBytes =
-                adhrncMngService.selectAdhrncMngExcel(searchVO);
+                adhrncMngService.selectAdhrncMngExcel(
+                        request.getSearchVO(),
+                        request.getColumns()
+                );
 
         ContentDisposition contentDisposition =
                 ContentDisposition.attachment()

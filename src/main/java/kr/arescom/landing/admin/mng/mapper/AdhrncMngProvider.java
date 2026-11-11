@@ -1,5 +1,8 @@
 package kr.arescom.landing.admin.mng.mapper;
 
+import java.util.List;
+import java.util.Map;
+
 import org.apache.ibatis.jdbc.SQL;
 
 import kr.arescom.landing.admin.mng.vo.AdhrncMngSearchVO;
@@ -11,6 +14,7 @@ public class AdhrncMngProvider {
         ADHRNC_NO AS adhrncNo,
         ADHRNC_NM AS adhrncNm,
         MOBLPHON AS moblphon,
+        EMAIL AS email,
         CUST_NM_01 AS custNm01,
         CUST_NM_02 AS custNm02,
         CUST_NM_03 AS custNm03,
@@ -38,8 +42,10 @@ public class AdhrncMngProvider {
      */
     private SQL createBaseSql(AdhrncMngSearchVO searchVO) {
         SQL sql = new SQL();
-        sql.FROM("TB_LANDING_ADHRNC");
-        sql.WHERE("USE_AT = 'Y'");
+        sql.FROM("TB_LANDING_ADHRNC A");
+        sql.FROM("TB_LANDING_USER B");
+        sql.WHERE("A.EVENT_ID = B.EVENT_ID");
+        sql.WHERE("A.USE_AT = 'Y'");
 
         if (searchVO.getKeyword() != null && !searchVO.getKeyword().trim().isEmpty()) {
             sql.WHERE("""
@@ -90,9 +96,19 @@ public class AdhrncMngProvider {
      * 엑셀 다운로드 전체 목록 조회
      * 페이징 없이 검색 조건에 해당하는 전체 데이터 조회
      */
-    public String selectAdhrncMngExcelList(AdhrncMngSearchVO searchVO) {
+    public String selectAdhrncMngExcelList(Map<String, Object> params) {
+
+        AdhrncMngSearchVO searchVO =
+            (AdhrncMngSearchVO) params.get("searchVO");
+
+        @SuppressWarnings("unchecked")
+        List<String> columns = (List<String>) params.get("columns");
+
         SQL sql = createBaseSql(searchVO);
-        sql.SELECT(SELECT_COLUMNS);
+
+        for (String column : columns) {
+            sql.SELECT(column);
+        }
 
         return sql.toString() + " ORDER BY " + getOrderBy(searchVO.getSortType());
     }

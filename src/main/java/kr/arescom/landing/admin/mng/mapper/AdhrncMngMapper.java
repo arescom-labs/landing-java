@@ -1,6 +1,7 @@
 package kr.arescom.landing.admin.mng.mapper;
 
 import java.util.List;
+import java.util.Map;
 
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -33,7 +34,10 @@ public interface AdhrncMngMapper {
     	    type = AdhrncMngProvider.class,
     	    method = "selectAdhrncMngExcelList"
     	)
-    	List<AdhrncVO> selectAdhrncMngExcelList(AdhrncMngSearchVO searchVO);
+    	List<Map<String, Object>> selectAdhrncMngExcelList(
+    	    @Param("searchVO") AdhrncMngSearchVO searchVO,
+    	    @Param("columns") List<String> columns
+    	);
 
     @Select("""
 		SELECT
@@ -48,11 +52,15 @@ public interface AdhrncMngMapper {
 		    END) AS recentCount,
 		    (
 		        SELECT COUNT(*)
-		        FROM TB_LANDING_ADHRNC
-		        WHERE RGTR_ID <> 'LANDING'
+		        FROM TB_LANDING_ADHRNC A
+    		  	, TB_LANDING_USER B
+    		  	WHERE A.EVENT_ID = B.EVENT_ID 
+		        AND RGTR_ID <> 'LANDING'
 		    ) AS adminCount
-		FROM TB_LANDING_ADHRNC
-		WHERE USE_AT = 'Y'
+		FROM TB_LANDING_ADHRNC A
+    		  	, TB_LANDING_USER B
+		WHERE A.EVENT_ID = B.EVENT_ID 
+		AND A.USE_AT = 'Y'
         """)
     AdhrncMngSummaryVO selectAdhrncMngSummary();
 
@@ -83,7 +91,7 @@ public interface AdhrncMngMapper {
         ) VALUES (
 			  (SELECT EVENT_ID FROM TB_EVENT_MANAGE WHERE USE_AT = 'Y')
 	        , #{adhrncNm}
-	        , #{moblphon}
+	        ,  REPLACE(#{moblphon}, '-', '')
 	        , #{email}
 	        , #{custNm01}
 	        , #{custNm02}
@@ -112,7 +120,7 @@ public interface AdhrncMngMapper {
         UPDATE TB_LANDING_ADHRNC
         SET
 	        ADHRNC_NM = #{adhrncNm}
-            , MOBLPHON = #{moblphon}
+            , MOBLPHON =  REPLACE(#{moblphon}, '-', '')
 	        , EMAIL = #{email}
 	        , CUST_NM_01 = #{custNm01}
 	        , CUST_NM_02 = #{custNm02}
